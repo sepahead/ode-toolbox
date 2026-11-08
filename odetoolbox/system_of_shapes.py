@@ -354,7 +354,7 @@ class SystemOfShapes:
                 # this is an inhomogeneous ODE
                 if _is_zero(self.A_[row, row]):
                     # of the form x' = const
-                    update_expr_terms.append(Config().output_timestep_symbol + " * " + str(self.b_[row]))
+                    update_expr_terms.append(Config().output_timestep_symbol + " * (" + str(self.b_[row]) + ")")
                 else:
 
                     #
