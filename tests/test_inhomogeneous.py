@@ -60,6 +60,44 @@ class TestInhomogeneous:
         np.testing.assert_allclose(actual, correct)
 
     @pytest.mark.parametrize("dt", [.1, 1.])
+    @pytest.mark.parametrize("ode_definition", ["(I_e + I_stim) / C_m",
+                                                "(I_e + I_stim) / C_m - x / tau"])
+    def test_inhomogeneous_sum(self, dt: float, ode_definition: str):
+        r"""Test ODEs with an inhomogeneous term that is a sum: x' = (I_e + I_stim) / C_m has a zero eigenvalue, x' = (I_e + I_stim) / C_m - x / tau is a decaying control. The timestep must multiply every term of the sum."""
+        I_e = 50.
+        I_stim = 100.
+        C_m = 100.
+        tau = 5.
+        x0 = 0.
+
+        parameters_dict = {sympy.Symbol("I_e", real=True): str(I_e),
+                           sympy.Symbol("I_stim", real=True): str(I_stim),
+                           sympy.Symbol("C_m", real=True): str(C_m),
+                           sympy.Symbol("tau", real=True): str(tau)}
+
+        shape = Shape.from_ode("x", ode_definition, initial_values={"x": str(x0)}, parameters=parameters_dict)
+        sys_of_shape = SystemOfShapes.from_shapes([shape], parameters=parameters_dict)
+        solver_dict = sys_of_shape.generate_propagator_solver()
+        solver_dict["parameters"] = {str(sym): expr for sym, expr in parameters_dict.items()}
+
+        analytic_integrator = AnalyticIntegrator(solver_dict)
+        analytic_integrator.set_initial_values({"x": str(x0)})
+        analytic_integrator.reset()
+
+        rate = (I_e + I_stim) / C_m
+        actual = []
+        correct = []
+        timevec = np.arange(0., 100., dt)
+        for t in timevec:
+            actual.append(analytic_integrator.get_value(t)[sympy.Symbol("x", real=True)])
+            if "tau" in ode_definition:
+                correct.append(rate * tau + (x0 - rate * tau) * np.exp(-t / tau))
+            else:
+                correct.append(x0 + rate * t)
+
+        np.testing.assert_allclose(actual, correct)
+
+    @pytest.mark.parametrize("dt", [.1, 1.])
     @pytest.mark.parametrize("ode_definition", ["(U - x) / tau",
                                                 "(1 - x) / tau"])
     def test_inhomogeneous_solver(self, dt, ode_definition):
